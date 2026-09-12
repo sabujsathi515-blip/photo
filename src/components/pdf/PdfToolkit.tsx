@@ -1,5 +1,6 @@
 import React, { useState, useRef } from "react";
 import { useApp } from "../../context/AppContext";
+import { BackButton } from "../common/BackButton";
 import {
   mergePdfs,
   extractPdfPages,
@@ -223,14 +224,17 @@ export const PdfToolkit: React.FC = () => {
     <div className="space-y-6 pb-12">
       {/* Header */}
       <div className="bg-slate-900/90 border border-slate-800 p-5 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <FileCode2 className="w-5 h-5 text-cyan-400" />
-            <h1 className="text-lg sm:text-xl font-extrabold text-white tracking-tight">
-              {t.pdfTools.title}
-            </h1>
+        <div className="flex items-center gap-3">
+          <BackButton />
+          <div>
+            <div className="flex items-center gap-2">
+              <FileCode2 className="w-5 h-5 text-cyan-400" />
+              <h1 className="text-lg sm:text-xl font-extrabold text-white tracking-tight">
+                {t.pdfTools.title}
+              </h1>
+            </div>
+            <p className="text-xs text-slate-400 mt-1">{t.pdfTools.subtitle}</p>
           </div>
-          <p className="text-xs text-slate-400 mt-1">{t.pdfTools.subtitle}</p>
         </div>
 
         <div className="flex items-center gap-2 text-xs font-semibold text-emerald-400 bg-emerald-950/40 px-3 py-1.5 rounded-xl border border-emerald-800/60">
@@ -287,10 +291,13 @@ export const PdfToolkit: React.FC = () => {
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="application/pdf"
+                accept=".pdf,application/pdf"
                 multiple
                 className="hidden"
-                onChange={(e) => handleMergeUpload(e.target.files)}
+                onChange={(e) => {
+                  handleMergeUpload(e.target.files);
+                  e.target.value = "";
+                }}
               />
             </div>
 
@@ -391,9 +398,14 @@ export const PdfToolkit: React.FC = () => {
             <input
               ref={singlePdfInputRef}
               type="file"
-              accept="application/pdf"
+              accept=".pdf,application/pdf"
               className="hidden"
-              onChange={(e) => e.target.files?.[0] && handleSinglePdfUpload(e.target.files[0])}
+              onChange={(e) => {
+                if (e.target.files?.[0]) {
+                  handleSinglePdfUpload(e.target.files[0]);
+                }
+                e.target.value = "";
+              }}
             />
 
             <div className="space-y-2">
@@ -608,10 +620,13 @@ export const PdfToolkit: React.FC = () => {
               <input
                 ref={imagesInputRef}
                 type="file"
-                accept="image/*"
+                accept="image/*,.jpg,.jpeg,.png,.webp,.bmp"
                 multiple
                 className="hidden"
-                onChange={(e) => handleImageUpload(e.target.files)}
+                onChange={(e) => {
+                  handleImageUpload(e.target.files);
+                  e.target.value = "";
+                }}
               />
             </div>
 

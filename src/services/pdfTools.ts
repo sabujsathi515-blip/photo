@@ -1,13 +1,36 @@
 import { PDFDocument, rgb, degrees, StandardFonts } from "pdf-lib";
 
+export type PdfSource = ArrayBuffer | Uint8Array | Blob;
+
+/**
+ * Safely converts any PDF input source to Uint8Array while preventing detached ArrayBuffer issues
+ */
+async function toSafePdfBytes(source: PdfSource): Promise<Uint8Array> {
+  if (source instanceof Blob) {
+    const ab = await source.arrayBuffer();
+    return new Uint8Array(ab);
+  }
+  if (source instanceof Uint8Array) {
+    return source.slice();
+  }
+  if (source instanceof ArrayBuffer) {
+    if (source.byteLength === 0) {
+      throw new Error("Cannot process PDF: ArrayBuffer is empty or detached.");
+    }
+    return new Uint8Array(source.slice(0));
+  }
+  throw new Error("Invalid PDF source");
+}
+
 /**
  * Merge multiple PDF files into one single PDF
  */
-export async function mergePdfs(pdfBuffers: ArrayBuffer[]): Promise<Uint8Array> {
+export async function mergePdfs(pdfBuffers: PdfSource[]): Promise<Uint8Array> {
   const mergedPdf = await PDFDocument.create();
 
   for (const buffer of pdfBuffers) {
-    const pdf = await PDFDocument.load(buffer, { ignoreEncryption: true });
+    const bytes = await toSafePdfBytes(buffer);
+    const pdf = await PDFDocument.load(bytes, { ignoreEncryption: true });
     const copiedPages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
     copiedPages.forEach((page) => mergedPdf.addPage(page));
   }
@@ -18,8 +41,9 @@ export async function mergePdfs(pdfBuffers: ArrayBuffer[]): Promise<Uint8Array> 
 /**
  * Split PDF - extracts specific page indices (0-based) into a new PDF
  */
-export async function extractPdfPages(pdfBuffer: ArrayBuffer, pageIndices: number[]): Promise<Uint8Array> {
-  const sourcePdf = await PDFDocument.load(pdfBuffer, { ignoreEncryption: true });
+export async function extractPdfPages(pdfBuffer: PdfSource, pageIndices: number[]): Promise<Uint8Array> {
+  const bytes = await toSafePdfBytes(pdfBuffer);
+  const sourcePdf = await PDFDocument.load(bytes, { ignoreEncryption: true });
   const newPdf = await PDFDocument.create();
 
   const validIndices = pageIndices.filter((idx) => idx >= 0 && idx < sourcePdf.getPageCount());
@@ -33,11 +57,12 @@ export async function extractPdfPages(pdfBuffer: ArrayBuffer, pageIndices: numbe
  * Rotate all or selected pages in PDF by angle (90, 180, 270)
  */
 export async function rotatePdfPages(
-  pdfBuffer: ArrayBuffer,
+  pdfBuffer: PdfSource,
   angle: 90 | 180 | 270,
   pageIndices?: number[]
 ): Promise<Uint8Array> {
-  const pdfDoc = await PDFDocument.load(pdfBuffer, { ignoreEncryption: true });
+  const bytes = await toSafePdfBytes(pdfBuffer);
+  const pdfDoc = await PDFDocument.load(bytes, { ignoreEncryption: true });
   const totalPages = pdfDoc.getPageCount();
 
   const targetIndices = pageIndices || Array.from({ length: totalPages }, (_, i) => i);
@@ -57,12 +82,13 @@ export async function rotatePdfPages(
  * Add Watermark Text to all pages in a PDF
  */
 export async function addWatermarkToPdf(
-  pdfBuffer: ArrayBuffer,
+  pdfBuffer: PdfSource,
   watermarkText: string,
   opacity = 0.25,
   fontSize = 42
 ): Promise<Uint8Array> {
-  const pdfDoc = await PDFDocument.load(pdfBuffer, { ignoreEncryption: true });
+  const bytes = await toSafePdfBytes(pdfBuffer);
+  const pdfDoc = await PDFDocument.load(bytes, { ignoreEncryption: true });
   const helveticaFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
   const pages = pdfDoc.getPages();
 
@@ -88,8 +114,9 @@ export async function addWatermarkToPdf(
 /**
  * Add Page Numbers (e.g. "Page 1 of 5") to all pages
  */
-export async function addPageNumbersToPdf(pdfBuffer: ArrayBuffer, position: "bottom-center" | "bottom-right" = "bottom-center"): Promise<Uint8Array> {
-  const pdfDoc = await PDFDocument.load(pdfBuffer, { ignoreEncryption: true });
+export async function addPageNumbersToPdf(pdfBuffer: PdfSource, position: "bottom-center" | "bottom-right" = "bottom-center"): Promise<Uint8Array> {
+  const bytes = await toSafePdfBytes(pdfBuffer);
+  const pdfDoc = await PDFDocument.load(bytes, { ignoreEncryption: true });
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
   const pages = pdfDoc.getPages();
   const totalPages = pages.length;

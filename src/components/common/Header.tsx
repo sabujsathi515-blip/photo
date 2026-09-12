@@ -9,6 +9,7 @@ import {
   X,
   Bell,
   Sparkles,
+  ArrowLeft,
 } from "lucide-react";
 
 interface HeaderProps {
@@ -17,7 +18,7 @@ interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = ({ sidebarOpen, setSidebarOpen }) => {
-  const { language, setLanguage, theme, toggleTheme, transactions, setActiveSection, t, profile, customers } = useApp();
+  const { language, setLanguage, theme, toggleTheme, transactions, activeSection, setActiveSection, t, profile, customers } = useApp();
   const [searchQuery, setSearchQuery] = useState("");
 
   // Calculate today's net income
@@ -31,7 +32,7 @@ export const Header: React.FC<HeaderProps> = ({ sidebarOpen, setSidebarOpen }) =
 
   return (
     <header className="h-14 sm:h-16 bg-slate-900/80 backdrop-blur-md border-b border-slate-800 flex items-center justify-between px-4 sm:px-6 shrink-0 z-30 transition-colors">
-      <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
+      <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
         {/* Mobile Sidebar Toggle */}
         <button
           onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -40,6 +41,18 @@ export const Header: React.FC<HeaderProps> = ({ sidebarOpen, setSidebarOpen }) =
         >
           {sidebarOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
         </button>
+
+        {/* Global Back to Dashboard button in Header whenever not in dashboard */}
+        {activeSection !== "dashboard" && (
+          <button
+            onClick={() => setActiveSection("dashboard")}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 hover:text-blue-300 border border-blue-500/40 text-xs font-bold transition-all shrink-0 cursor-pointer shadow-sm group"
+            title={language === "bn" ? "ড্যাশবোর্ডে ফিরে যান" : "Back to Dashboard"}
+          >
+            <ArrowLeft className="w-3.5 h-3.5 group-hover:-translate-x-0.5 transition-transform" />
+            <span className="hidden xs:inline">{language === "bn" ? "ড্যাশবোর্ড (Back)" : "Dashboard"}</span>
+          </button>
+        )}
 
         {/* Brand in Header (Mobile/Small Screen or High Density display) */}
         <div
@@ -57,7 +70,7 @@ export const Header: React.FC<HeaderProps> = ({ sidebarOpen, setSidebarOpen }) =
         </div>
 
         {/* Search Bar */}
-        <div className="relative w-48 sm:w-80 md:w-96 ml-2 sm:ml-4">
+        <div className="relative w-40 sm:w-72 md:w-80 ml-1 sm:ml-3">
           <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
           <input
             type="text"

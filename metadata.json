@@ -1,6 +1,6 @@
 {
   "name": "DIGITAL SEVA PRO",
-  "description": "Cyber Café, Photo Studio, School Project & Digital Services - All in One workstation for photo editing, passport prints, school projects, document drafting, PDF toolkit, PSD management, and accounting.",
+  "description": "Cyber Café, Photo Studio, School Project & Digital Services - All in One workstation for WhatsApp document straightening, photo editing, passport prints, school projects, document drafting, PDF toolkit, PSD management, and accounting.",
   "requestFramePermissions": ["camera"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

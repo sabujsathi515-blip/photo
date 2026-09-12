@@ -14,10 +14,12 @@ export type NavSection =
   | "pdf_tools"
   | "design_studio"
   | "psd_manager"
+  | "whatsapp_doc_fix"
   | "gov_services"
   | "accounting"
   | "settings"
   // Legacy aliases
+  | "whatsapp-doc-fix"
   | "photo-studio"
   | "passport-photo"
   | "photo-print-layout"

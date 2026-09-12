@@ -1,5 +1,6 @@
 import React, { useState, useRef } from "react";
 import { useApp } from "../../context/AppContext";
+import { BackButton } from "../common/BackButton";
 import { compressToTargetKB, resizeToDimensions } from "../../services/imageTools";
 import {
   Image as ImageIcon,
@@ -106,20 +107,25 @@ export const ImageTools: React.FC = () => {
   return (
     <div className="space-y-6 pb-12">
       {/* Header */}
-      <div className="bg-slate-900/90 border border-slate-800 p-5 rounded-2xl">
-        <div className="flex items-center gap-2">
-          <ImageIcon className="w-5 h-5 text-indigo-400" />
-          <h1 className="text-lg sm:text-xl font-extrabold text-white tracking-tight">
-            {language === "bn"
-              ? "অনলাইন ফর্ম ফটো ও সিগনেচার সাইজ টুল (KB & DPI)"
-              : "Govt Job Photo & Signature Resizer (KB & DPI)"}
-          </h1>
+      <div className="bg-slate-900/90 border border-slate-800 p-5 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <BackButton />
+          <div>
+            <div className="flex items-center gap-2">
+              <ImageIcon className="w-5 h-5 text-indigo-400" />
+              <h1 className="text-lg sm:text-xl font-extrabold text-white tracking-tight">
+                {language === "bn"
+                  ? "অনলাইন ফর্ম ফটো ও সিগনেচার সাইজ টুল (KB & DPI)"
+                  : "Govt Job Photo & Signature Resizer (KB & DPI)"}
+              </h1>
+            </div>
+            <p className="text-xs text-slate-400 mt-1">
+              {language === "bn"
+                ? "SSC, WBCS, WB Police, Railway ও NSDL পোর্টালের জন্য নির্দিষ্ট KB (১০-২০ KB Signature, ২০-৫০ KB Photo) ও DPI সাইজ নির্ধারণ করুন।"
+                : "Compress exactly to 10-20KB signatures and 20-50KB photos with 200/300 DPI for government portals."}
+            </p>
+          </div>
         </div>
-        <p className="text-xs text-slate-400 mt-1">
-          {language === "bn"
-            ? "SSC, WBCS, WB Police, Railway ও NSDL পোর্টালের জন্য নির্দিষ্ট KB (১০-২০ KB Signature, ২০-৫০ KB Photo) ও DPI সাইজ নির্ধারণ করুন।"
-            : "Compress exactly to 10-20KB signatures and 20-50KB photos with 200/300 DPI for government portals."}
-        </p>
       </div>
 
       {/* Quick Portal Presets */}

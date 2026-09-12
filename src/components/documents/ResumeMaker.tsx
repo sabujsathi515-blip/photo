@@ -1,5 +1,6 @@
 import React, { useState, useRef } from "react";
 import { useApp } from "../../context/AppContext";
+import { BackButton } from "../common/BackButton";
 import { ResumeData } from "../../types";
 import { exportResumeToDocx } from "../../services/docxExport";
 import {
@@ -134,14 +135,17 @@ export const ResumeMaker: React.FC = () => {
     <div className="space-y-6 pb-12">
       {/* Header */}
       <div className="bg-slate-900/90 border border-slate-800 p-5 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <Contact className="w-5 h-5 text-indigo-400" />
-            <h1 className="text-lg sm:text-xl font-extrabold text-white tracking-tight">
-              {t.resumeMaker.title}
-            </h1>
+        <div className="flex items-center gap-3">
+          <BackButton />
+          <div>
+            <div className="flex items-center gap-2">
+              <Contact className="w-5 h-5 text-indigo-400" />
+              <h1 className="text-lg sm:text-xl font-extrabold text-white tracking-tight">
+                {t.resumeMaker.title}
+              </h1>
+            </div>
+            <p className="text-xs text-slate-400 mt-1">{t.resumeMaker.subtitle}</p>
           </div>
-          <p className="text-xs text-slate-400 mt-1">{t.resumeMaker.subtitle}</p>
         </div>
 
         <div className="flex items-center gap-2">

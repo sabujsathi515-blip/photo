@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useApp } from "../../context/AppContext";
+import { BackButton } from "../common/BackButton";
 import { loadImage } from "../../services/imageTools";
 import { jsPDF } from "jspdf";
 import {
@@ -268,14 +269,17 @@ export const PhotoPrintLayout: React.FC = () => {
     <div className="space-y-5 pb-12">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-900/90 border border-slate-800 p-4 sm:p-5 rounded-2xl">
-        <div>
-          <div className="flex items-center gap-2">
-            <Grid className="w-5 h-5 text-amber-400" />
-            <h1 className="text-lg sm:text-xl font-extrabold text-white tracking-tight">
-              {t.photoPrintLayout.title}
-            </h1>
+        <div className="flex items-center gap-3">
+          <BackButton />
+          <div>
+            <div className="flex items-center gap-2">
+              <Grid className="w-5 h-5 text-amber-400" />
+              <h1 className="text-lg sm:text-xl font-extrabold text-white tracking-tight">
+                {t.photoPrintLayout.title}
+              </h1>
+            </div>
+            <p className="text-xs text-slate-400 mt-0.5">{t.photoPrintLayout.subtitle}</p>
           </div>
-          <p className="text-xs text-slate-400 mt-0.5">{t.photoPrintLayout.subtitle}</p>
         </div>
 
         {layoutPreviewUrl && (

@@ -249,6 +249,9 @@ Provide clean, formatted document text ready for printing on A4 paper with stand
 
 // Vite Middleware for development & Static Serving for production
 async function startServer() {
+  // Always serve public directory assets (pdf.worker, icons, etc.)
+  app.use(express.static(path.join(process.cwd(), "public")));
+
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
       server: { middlewareMode: true },

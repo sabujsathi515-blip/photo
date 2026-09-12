@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useApp } from "../../context/AppContext";
+import { BackButton } from "../common/BackButton";
 import {
   Calculator,
   BadgeIndianRupee,
@@ -57,18 +58,23 @@ export const PhotoCalculator: React.FC = () => {
   return (
     <div className="space-y-6 pb-12">
       {/* Header */}
-      <div className="bg-slate-900/90 border border-slate-800 p-5 rounded-2xl">
-        <div className="flex items-center gap-2">
-          <Calculator className="w-5 h-5 text-amber-400" />
-          <h1 className="text-lg sm:text-xl font-extrabold text-white tracking-tight">
-            {language === "bn" ? "প্রিন্ট ও ফটো খরচ ও লাভ ক্যালকুলেটর" : "Photo & Print Profit Estimator"}
-          </h1>
+      <div className="bg-slate-900/90 border border-slate-800 p-5 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <BackButton />
+          <div>
+            <div className="flex items-center gap-2">
+              <Calculator className="w-5 h-5 text-amber-400" />
+              <h1 className="text-lg sm:text-xl font-extrabold text-white tracking-tight">
+                {language === "bn" ? "প্রিন্ট ও ফটো খরচ ও লাভ ক্যালকুলেটর" : "Photo & Print Profit Estimator"}
+              </h1>
+            </div>
+            <p className="text-xs text-slate-400 mt-1">
+              {language === "bn"
+                ? "কাগজ, কালি ও বিদ্যুৎ খরচের সঠিক হিসাব দেখে কাস্টমার রেট এবং নেট প্রফিট মার্জিন নির্ধারণ করুন।"
+                : "Accurate breakdown of paper, ink, electricity vs customer pricing and net margins."}
+            </p>
+          </div>
         </div>
-        <p className="text-xs text-slate-400 mt-1">
-          {language === "bn"
-            ? "কাগজ, কালি ও বিদ্যুৎ খরচের সঠিক হিসাব দেখে কাস্টমার রেট এবং নেট প্রফিট মার্জিন নির্ধারণ করুন।"
-            : "Accurate breakdown of paper, ink, electricity vs customer pricing and net margins."}
-        </p>
       </div>
 
       {/* Preset Service Selectors */}

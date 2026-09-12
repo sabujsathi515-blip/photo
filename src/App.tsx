@@ -13,6 +13,7 @@ import { ImageTools } from "./components/photo/ImageTools";
 import { SchoolProjectMaker } from "./components/school/SchoolProjectMaker";
 import { DocumentMaker } from "./components/documents/DocumentMaker";
 import { ResumeMaker } from "./components/documents/ResumeMaker";
+import { WhatsAppDocFix } from "./components/documents/WhatsAppDocFix";
 import { PdfToolkit } from "./components/pdf/PdfToolkit";
 import { DesignStudio } from "./components/design/DesignStudio";
 import { PsdManager } from "./components/psd/PsdManager";
@@ -60,6 +61,9 @@ const MainContent: React.FC = () => {
       case "pdf_tools":
       case "pdf-tools":
         return <PdfToolkit />;
+      case "whatsapp_doc_fix":
+      case "whatsapp-doc-fix":
+        return <WhatsAppDocFix />;
       case "design_studio":
       case "design-studio":
         return <DesignStudio />;

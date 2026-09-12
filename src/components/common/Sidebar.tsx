@@ -22,6 +22,7 @@ import {
   Building2,
   Settings,
   Zap,
+  Smartphone,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -51,6 +52,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen })
     {
       groupTitle: language === "bn" ? "ফটো ও প্রিন্ট স্টুডিও" : "Photo & Print",
       items: [
+        { id: "whatsapp-doc-fix", label: t.nav.whatsappDocFix, icon: Smartphone, badge: "Deskew", badgeColor: "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" },
         { id: "photo-studio", label: t.nav.photoStudio, icon: Camera },
         { id: "passport-photo", label: t.nav.passportPhoto, icon: UserCheck, badge: "Auto-Crop", badgeColor: "bg-blue-500/10 text-blue-400 border border-blue-500/20" },
         { id: "photo-print-layout", label: t.nav.photoPrintLayout, icon: Grid, badge: "A4 / 4R", badgeColor: "bg-amber-500/10 text-amber-400 border border-amber-500/20" },

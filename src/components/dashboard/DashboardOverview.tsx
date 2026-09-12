@@ -27,6 +27,8 @@ import {
   Minimize2,
   FileSearch,
   CheckCircle,
+  Smartphone,
+  Wand2,
 } from "lucide-react";
 import { NavSection } from "../../types";
 
@@ -116,6 +118,15 @@ export const DashboardOverview: React.FC = () => {
     badge?: string;
   }[] = [
     {
+      id: "whatsapp-doc-fix",
+      title: "WhatsApp Doc Fix & Clean Print",
+      titleBn: "হোয়াটসঅ্যাপ ডক সোজা ও প্রিন্ট",
+      description: "Perspective 4-corner crop, deskew, white background & 1-click A4 print",
+      descriptionBn: "বাঁকা ফটো/PDF সোজা, শ্যাডো দূরীকরণ, সাদা কাগজ ও ১-ক্লিক প্রিন্ট",
+      icon: Smartphone,
+      badge: "Deskew",
+    },
+    {
       id: "photo-studio",
       title: "Photo Studio",
       titleBn: "ফটো স্টুডিও",
@@ -189,6 +200,43 @@ export const DashboardOverview: React.FC = () => {
 
   return (
     <div className="space-y-5 pb-8 font-sans">
+      {/* Featured WhatsApp Doc Straightener & Clean Print Banner */}
+      <div className="bg-gradient-to-r from-emerald-950/60 via-slate-900 to-indigo-950/60 border border-emerald-500/30 p-4 sm:p-5 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-lg">
+        <div className="flex items-center gap-3.5">
+          <div className="w-12 h-12 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 shrink-0 shadow-inner">
+            <Smartphone className="w-6 h-6" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="text-sm sm:text-base font-extrabold text-white">
+                {language === "bn"
+                  ? "হোয়াটসঅ্যাপ বাঁকা ডকুমেন্ট সোজা ও ক্লিন প্রিন্ট টুল"
+                  : "WhatsApp Document Straightener & Clean Print"}
+              </h2>
+              <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                NEW
+              </span>
+            </div>
+            <p className="text-xs text-slate-300 mt-0.5 leading-relaxed">
+              {language === "bn"
+                ? "কাস্টমারের পাঠানো বাঁকা ফটো ও PDF ৪-কোণ টেনে সোজা করুন, টেবিল/বেডের শ্যাডো মুছে ধবধবে সাদা জেরক্স বানান ও সরাসরি A4 প্রিন্ট করুন।"
+                : "Straighten skewed mobile camera photos & PDFs with 4-corner perspective crop, whiten shadows & print clean A4 copies."}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={() => setActiveSection("whatsapp-doc-fix")}
+            className="w-full md:w-auto px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold shadow-md hover:shadow-emerald-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
+          >
+            <Wand2 className="w-4 h-4" />
+            {language === "bn" ? "ডকুমেন্ট সোজা করুন" : "Launch Straightener"}
+            <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </div>
+
       {/* 4 High Density Quick Action Hub Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
         {/* Card 1: Passport Photo Maker */}

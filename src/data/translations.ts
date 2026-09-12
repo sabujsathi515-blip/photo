@@ -4,6 +4,7 @@ export const translations = {
     appTagline: "সাইবার ক্যাফে, ফটো স্টুডিও, স্কুল প্রজেক্ট ও ডিজিটাল সার্ভিস - অল ইন ওয়ান",
     nav: {
       dashboard: "ড্যাশবোর্ড",
+      whatsappDocFix: "হোয়াটসঅ্যাপ ডক সোজা ও প্রিন্ট",
       photoStudio: "ফটো স্টুডিও",
       passportPhoto: "পাসপোর্ট ফটো",
       photoPrintLayout: "ফটো প্রিন্ট লেআউট",
@@ -307,6 +308,7 @@ export const translations = {
     appTagline: "Cyber Café, Photo Studio, School Project & Digital Services - All in One",
     nav: {
       dashboard: "Dashboard",
+      whatsappDocFix: "WhatsApp Doc Straightener",
       photoStudio: "Photo Studio",
       passportPhoto: "Passport Photo",
       photoPrintLayout: "Photo Print Layout",
