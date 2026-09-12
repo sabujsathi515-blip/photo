@@ -43,7 +43,29 @@ import {
   ZoomOut,
   Smartphone,
   Share2,
+  Save,
+  CheckCircle2,
+  Plus,
+  Trash2,
+  Copy,
+  Layers3,
+  FileCheck,
 } from "lucide-react";
+
+export interface SavedPageItem {
+  id: string;
+  pageNumber: number;
+  title: string;
+  sourceDataUrl: string;
+  sourceDimensions: { width: number; height: number };
+  corners: QuadCorners;
+  rotation: number;
+  isStraightened: boolean;
+  straightenedDataUrl: string | null;
+  enhancedDataUrl: string | null;
+  settings: EnhancementSettings;
+  timestamp: number;
+}
 
 export const WhatsAppDocFix: React.FC = () => {
   const { language, notify, setActiveSection } = useApp();
@@ -87,8 +109,15 @@ export const WhatsAppDocFix: React.FC = () => {
   const [paperMargin, setPaperMargin] = useState<"standard" | "narrow" | "none">("standard");
   const [isDraggingOver, setIsDraggingOver] = useState<boolean>(false);
 
+  // Multi-page Auto-Save Management (বাঁকা সোজা করলে পেজ গুলি অটোমেটিক সেভ হবে)
+  const [savedPages, setSavedPages] = useState<SavedPageItem[]>([]);
+  const [activePageIndex, setActivePageIndex] = useState<number>(0);
+  const [lastSavedTime, setLastSavedTime] = useState<string | null>(null);
+  const [isAutoSavedNoticeVisible, setIsAutoSavedNoticeVisible] = useState<boolean>(false);
+
   // Refs
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const addMoreFilesInputRef = useRef<HTMLInputElement>(null);
   const cropCanvasRef = useRef<HTMLCanvasElement>(null);
   const imageObjRef = useRef<HTMLImageElement | null>(null);
   const printAreaRef = useRef<HTMLDivElement>(null);
@@ -171,20 +200,52 @@ export const WhatsAppDocFix: React.FC = () => {
     setLoadingFile(true);
     setIsPdf(false);
     setPdfBlob(null);
+    setPdfTotalPages(1);
+    setPdfPage(1);
     const dataUrl = generateSampleDoc(type);
     const sampleNames = {
       aadhaar: "WhatsApp_Aadhaar_Slanted.jpg",
       application: "WhatsApp_Govt_Application.jpg",
       marksheet: "WhatsApp_Marksheet_Tilted.jpg",
     };
-    setFileName(sampleNames[type]);
-    loadImageIntoWorkspace(dataUrl);
+    const title = sampleNames[type];
+    setFileName(title);
+
+    const initialPage: SavedPageItem = {
+      id: `sample-${type}-${Date.now()}`,
+      pageNumber: 1,
+      title: title,
+      sourceDataUrl: dataUrl,
+      sourceDimensions: { width: 800, height: 1000 },
+      corners: {
+        topLeft: { x: 50, y: 50 },
+        topRight: { x: 550, y: 50 },
+        bottomRight: { x: 550, y: 750 },
+        bottomLeft: { x: 50, y: 750 },
+      },
+      rotation: 0,
+      isStraightened: false,
+      straightenedDataUrl: null,
+      enhancedDataUrl: null,
+      settings: { ...defaultEnhancementSettings },
+      timestamp: Date.now(),
+    };
+    setSavedPages([initialPage]);
+    setActivePageIndex(0);
+
+    loadImageIntoWorkspace(dataUrl, undefined, 0, 0, title);
   };
 
   /**
    * Loads image DataURL into the workspace and initializes corner coordinates
    */
-  const loadImageIntoWorkspace = (dataUrl: string) => {
+  const loadImageIntoWorkspace = (
+    dataUrl: string,
+    initialCorners?: QuadCorners,
+    initialRot?: number,
+    pageIdx: number = 0,
+    docTitle?: string
+  ) => {
     const img = new Image();
     img.crossOrigin = "anonymous";
     img.onload = () => {
@@ -192,10 +253,11 @@ export const WhatsAppDocFix: React.FC = () => {
       setSourceDataUrl(dataUrl);
       setSourceDimensions({ width: img.width, height: img.height });
 
-      // Initialize default corners (e.g. 5% inset)
-      const initCorners = getDefaultCorners(img.width, img.height);
+      // Use supplied corners or calculate 5% inset
+      const initCorners = initialCorners || getDefaultCorners(img.width, img.height);
+      const rot = initialRot !== undefined ? initialRot : 0;
       setCorners(initCorners);
-      setFineRotation(0);
+      setFineRotation(rot);
       setStage("preview");
       setLoadingFile(false);
 
@@ -215,8 +277,43 @@ export const WhatsAppDocFix: React.FC = () => {
         console.error("Canvas pre-init error:", e);
       }
 
-      // Render crop canvas if available
-      renderCropEditor(img, initCorners, 0, showGrid);
+      // Sync savedPages list
+      setSavedPages((prev) => {
+        if (prev.length === 0) {
+          return [
+            {
+              id: `page-${Date.now()}`,
+              pageNumber: 1,
+              title: docTitle || fileName || "Page 1",
+              sourceDataUrl: dataUrl,
+              sourceDimensions: { width: img.width, height: img.height },
+              corners: initCorners,
+              rotation: rot,
+              isStraightened: false,
+              straightenedDataUrl: null,
+              enhancedDataUrl: null,
+              settings: { ...settings },
+              timestamp: Date.now(),
+            },
+          ];
+        }
+
+        const updated = [...prev];
+        if (updated[pageIdx]) {
+          updated[pageIdx] = {
+            ...updated[pageIdx],
+            sourceDataUrl: dataUrl,
+            sourceDimensions: { width: img.width, height: img.height },
+            corners: initialCorners || updated[pageIdx].corners,
+            rotation: initialRot !== undefined ? initialRot : updated[pageIdx].rotation,
+          };
+          return updated;
+        }
+        return prev;
+      });
+
+      // Render crop canvas
+      renderCropEditor(img, initCorners, rot, showGrid);
     };
     img.onerror = () => {
       setLoadingFile(false);
@@ -244,15 +341,200 @@ export const WhatsAppDocFix: React.FC = () => {
   };
 
   /**
-   * File upload handler for input change
+   * File upload handler for input change (supports multiple files)
    */
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
-    const file = files[0];
-    // Reset file input value so user can select the same file again if desired
+    const fileList: File[] = Array.from(files) as File[];
     e.target.value = "";
-    processUploadedFile(file);
+
+    if (fileList.length === 1) {
+      processUploadedFile(fileList[0]);
+    } else {
+      // Multiple files uploaded at once
+      handleUploadMultipleFiles(fileList);
+    }
+  };
+
+  /**
+   * Upload multiple image files and register them into savedPages
+   */
+  const handleUploadMultipleFiles = async (fileList: File[]) => {
+    setLoadingFile(true);
+    const pages: SavedPageItem[] = [];
+
+    for (let i = 0; i < fileList.length; i++) {
+      const file = fileList[i];
+      const isPdfFile =
+        file.type === "application/pdf" ||
+        file.type === "application/x-pdf" ||
+        file.name.toLowerCase().endsWith(".pdf");
+
+      if (isPdfFile) {
+        try {
+          const rendered = await renderPdfPage(file, 1, 2.0);
+          pages.push({
+            id: `doc-${Date.now()}-${i}`,
+            pageNumber: pages.length + 1,
+            title: file.name.replace(/\.[^/.]+$/, ""),
+            sourceDataUrl: rendered.dataUrl,
+            sourceDimensions: { width: rendered.width, height: rendered.height },
+            corners: getDefaultCorners(rendered.width, rendered.height),
+            rotation: 0,
+            isStraightened: false,
+            straightenedDataUrl: null,
+            enhancedDataUrl: null,
+            settings: { ...defaultEnhancementSettings },
+            timestamp: Date.now(),
+          });
+        } catch (e) {
+          console.error("PDF upload error:", e);
+        }
+      } else {
+        await new Promise<void>((resolve) => {
+          const reader = new FileReader();
+          reader.onload = (ev) => {
+            const dataUrl = ev.target?.result as string;
+            if (!dataUrl) {
+              resolve();
+              return;
+            }
+            const img = new Image();
+            img.onload = () => {
+              pages.push({
+                id: `doc-${Date.now()}-${i}`,
+                pageNumber: pages.length + 1,
+                title: file.name.replace(/\.[^/.]+$/, "") || `Page ${pages.length + 1}`,
+                sourceDataUrl: dataUrl,
+                sourceDimensions: { width: img.width, height: img.height },
+                corners: getDefaultCorners(img.width, img.height),
+                rotation: 0,
+                isStraightened: false,
+                straightenedDataUrl: null,
+                enhancedDataUrl: null,
+                settings: { ...defaultEnhancementSettings },
+                timestamp: Date.now(),
+              });
+              resolve();
+            };
+            img.onerror = () => resolve();
+            img.src = dataUrl;
+          };
+          reader.onerror = () => resolve();
+          reader.readAsDataURL(file);
+        });
+      }
+    }
+
+    if (pages.length > 0) {
+      setSavedPages(pages);
+      setActivePageIndex(0);
+      setPdfTotalPages(pages.length);
+      setPdfPage(1);
+      setFileName(pages[0].title);
+      loadImageIntoWorkspace(pages[0].sourceDataUrl, pages[0].corners, pages[0].rotation, 0, pages[0].title);
+      notify(
+        language === "bn"
+          ? `মোট ${pages.length}টি ফাইল সফলভাবে আপলোড হয়েছে!`
+          : `${pages.length} files loaded successfully!`,
+        "success"
+      );
+    } else {
+      setLoadingFile(false);
+    }
+  };
+
+  /**
+   * Append more files to existing collection
+   */
+  const handleAddMoreFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    const fileList: File[] = Array.from(files) as File[];
+    e.target.value = "";
+
+    setLoadingFile(true);
+    let addedCount = 0;
+
+    for (let i = 0; i < fileList.length; i++) {
+      const file = fileList[i];
+      const isPdfFile =
+        file.type === "application/pdf" ||
+        file.type === "application/x-pdf" ||
+        file.name.toLowerCase().endsWith(".pdf");
+
+      if (isPdfFile) {
+        try {
+          const rendered = await renderPdfPage(file, 1, 2.0);
+          setSavedPages((prev) => [
+            ...prev,
+            {
+              id: `append-${Date.now()}-${i}`,
+              pageNumber: prev.length + 1,
+              title: file.name.replace(/\.[^/.]+$/, "") || `Page ${prev.length + 1}`,
+              sourceDataUrl: rendered.dataUrl,
+              sourceDimensions: { width: rendered.width, height: rendered.height },
+              corners: getDefaultCorners(rendered.width, rendered.height),
+              rotation: 0,
+              isStraightened: false,
+              straightenedDataUrl: null,
+              enhancedDataUrl: null,
+              settings: { ...defaultEnhancementSettings },
+              timestamp: Date.now(),
+            },
+          ]);
+          addedCount++;
+        } catch (err) {
+          console.error("PDF append error:", err);
+        }
+      } else {
+        await new Promise<void>((resolve) => {
+          const reader = new FileReader();
+          reader.onload = (ev) => {
+            const dataUrl = ev.target?.result as string;
+            if (!dataUrl) {
+              resolve();
+              return;
+            }
+            const img = new Image();
+            img.onload = () => {
+              setSavedPages((prev) => [
+                ...prev,
+                {
+                  id: `append-${Date.now()}-${i}`,
+                  pageNumber: prev.length + 1,
+                  title: file.name.replace(/\.[^/.]+$/, "") || `Page ${prev.length + 1}`,
+                  sourceDataUrl: dataUrl,
+                  sourceDimensions: { width: img.width, height: img.height },
+                  corners: getDefaultCorners(img.width, img.height),
+                  rotation: 0,
+                  isStraightened: false,
+                  straightenedDataUrl: null,
+                  enhancedDataUrl: null,
+                  settings: { ...defaultEnhancementSettings },
+                  timestamp: Date.now(),
+                },
+              ]);
+              addedCount++;
+              resolve();
+            };
+            img.onerror = () => resolve();
+            img.src = dataUrl;
+          };
+          reader.onerror = () => resolve();
+          reader.readAsDataURL(file);
+        });
+      }
+    }
+
+    setLoadingFile(false);
+    notify(
+      language === "bn"
+        ? `${addedCount}টি নতুন পেজ তালিকায় যোগ করা হয়েছে!`
+        : `${addedCount} new pages added to list!`,
+      "success"
+    );
   };
 
   const handleImageUpload = (file: File) => {
@@ -265,7 +547,29 @@ export const WhatsAppDocFix: React.FC = () => {
     const reader = new FileReader();
     reader.onload = (e) => {
       if (e.target?.result) {
-        loadImageIntoWorkspace(e.target.result as string);
+        const dataUrl = e.target.result as string;
+        const initialPage: SavedPageItem = {
+          id: `img-${Date.now()}`,
+          pageNumber: 1,
+          title: file.name.replace(/\.[^/.]+$/, ""),
+          sourceDataUrl: dataUrl,
+          sourceDimensions: { width: 800, height: 1000 },
+          corners: {
+            topLeft: { x: 50, y: 50 },
+            topRight: { x: 550, y: 50 },
+            bottomRight: { x: 550, y: 750 },
+            bottomLeft: { x: 50, y: 750 },
+          },
+          rotation: 0,
+          isStraightened: false,
+          straightenedDataUrl: null,
+          enhancedDataUrl: null,
+          settings: { ...defaultEnhancementSettings },
+          timestamp: Date.now(),
+        };
+        setSavedPages([initialPage]);
+        setActivePageIndex(0);
+        loadImageIntoWorkspace(dataUrl, undefined, 0, 0, initialPage.title);
         notify(
           language === "bn"
             ? "ছবি সফলভাবে লোড হয়েছে!"
@@ -295,7 +599,40 @@ export const WhatsAppDocFix: React.FC = () => {
 
       const rendered = await renderPdfPage(file, 1, 2.0);
       setPdfTotalPages(rendered.totalPages);
-      loadImageIntoWorkspace(rendered.dataUrl);
+      const docTitle = file.name.replace(/\.[^/.]+$/, "");
+      setFileName(docTitle);
+
+      // Pre-populate saved pages list for all PDF pages
+      const initialPdfPages: SavedPageItem[] = [];
+      for (let p = 1; p <= rendered.totalPages; p++) {
+        initialPdfPages.push({
+          id: `pdf-page-${p}-${Date.now()}`,
+          pageNumber: p,
+          title: `${docTitle} - Page ${p}`,
+          sourceDataUrl: p === 1 ? rendered.dataUrl : "",
+          sourceDimensions:
+            p === 1
+              ? { width: rendered.width, height: rendered.height }
+              : { width: 0, height: 0 },
+          corners: getDefaultCorners(rendered.width, rendered.height),
+          rotation: 0,
+          isStraightened: false,
+          straightenedDataUrl: null,
+          enhancedDataUrl: null,
+          settings: { ...defaultEnhancementSettings },
+          timestamp: Date.now(),
+        });
+      }
+      setSavedPages(initialPdfPages);
+      setActivePageIndex(0);
+
+      loadImageIntoWorkspace(
+        rendered.dataUrl,
+        undefined,
+        0,
+        0,
+        `${docTitle} - Page 1`
+      );
       notify(
         language === "bn"
           ? `PDF সফলভাবে লোড হয়েছে (মোট ${rendered.totalPages} পেজ)`
@@ -314,23 +651,161 @@ export const WhatsAppDocFix: React.FC = () => {
     }
   };
 
-  const switchPdfPage = async (newPage: number) => {
-    if (!pdfBlob) return;
-    try {
+  /**
+   * Save current active page state into savedPages array
+   */
+  const syncActivePageToState = () => {
+    setSavedPages((prev) => {
+      if (!prev[activePageIndex]) return prev;
+      const copy = [...prev];
+      copy[activePageIndex] = {
+        ...copy[activePageIndex],
+        corners: { ...corners },
+        rotation: fineRotation,
+        settings: { ...settings },
+        enhancedDataUrl: enhancedDataUrl || copy[activePageIndex].enhancedDataUrl,
+        straightenedDataUrl: straightenedCanvas
+          ? straightenedCanvas.toDataURL("image/jpeg", 0.95)
+          : copy[activePageIndex].straightenedDataUrl,
+      };
+      return copy;
+    });
+  };
+
+  /**
+   * Select a saved page from the gallery/tray
+   */
+  const selectSavedPage = async (targetIndex: number) => {
+    if (targetIndex < 0 || targetIndex >= savedPages.length) return;
+
+    // 1. Sync current state before switching
+    syncActivePageToState();
+
+    // 2. Target page info
+    setActivePageIndex(targetIndex);
+    const targetPage = savedPages[targetIndex];
+    if (!targetPage) return;
+
+    setPdfPage(targetPage.pageNumber);
+
+    // 3. If target page was already straightened, restore its state immediately
+    if (targetPage.isStraightened && targetPage.straightenedDataUrl) {
       setLoadingFile(true);
-      const rendered = await renderPdfPage(pdfBlob, newPage, 2.0);
-      setPdfPage(newPage);
-      loadImageIntoWorkspace(rendered.dataUrl);
-    } catch (e: any) {
-      console.error(e);
-      setLoadingFile(false);
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => {
+        imageObjRef.current = img;
+        const c = document.createElement("canvas");
+        c.width = img.width;
+        c.height = img.height;
+        const ctx = c.getContext("2d");
+        if (ctx) ctx.drawImage(img, 0, 0);
+        setStraightenedCanvas(c);
+        setEnhancedDataUrl(targetPage.enhancedDataUrl || targetPage.straightenedDataUrl);
+        setSettings(targetPage.settings);
+        setSourceDataUrl(targetPage.sourceDataUrl || targetPage.straightenedDataUrl);
+        setCorners(targetPage.corners);
+        setFineRotation(targetPage.rotation);
+        setStage("enhance");
+        setLoadingFile(false);
+      };
+      img.onerror = () => {
+        setLoadingFile(false);
+      };
+      img.src = targetPage.straightenedDataUrl;
+      return;
+    }
+
+    // 4. If target page already has raw sourceDataUrl
+    if (targetPage.sourceDataUrl) {
+      loadImageIntoWorkspace(
+        targetPage.sourceDataUrl,
+        targetPage.corners,
+        targetPage.rotation,
+        targetIndex,
+        targetPage.title
+      );
+      setSettings(targetPage.settings);
+      setStage("preview");
+      return;
+    }
+
+    // 5. If it's a PDF page that hasn't been rendered yet
+    if (isPdf && pdfBlob) {
+      try {
+        setLoadingFile(true);
+        const rendered = await renderPdfPage(pdfBlob, targetPage.pageNumber, 2.0);
+        setSavedPages((prev) => {
+          const copy = [...prev];
+          if (copy[targetIndex]) {
+            copy[targetIndex] = {
+              ...copy[targetIndex],
+              sourceDataUrl: rendered.dataUrl,
+              sourceDimensions: { width: rendered.width, height: rendered.height },
+              corners: getDefaultCorners(rendered.width, rendered.height),
+            };
+          }
+          return copy;
+        });
+        loadImageIntoWorkspace(
+          rendered.dataUrl,
+          undefined,
+          0,
+          targetIndex,
+          targetPage.title
+        );
+      } catch (err: any) {
+        console.error(err);
+        setLoadingFile(false);
+        notify(
+          language === "bn" ? "পেজ লোড করতে সমস্যা হয়েছে" : "Failed to load page",
+          "error"
+        );
+      }
+    }
+  };
+
+  /**
+   * PDF Page Navigation helper
+   */
+  const switchPdfPage = async (newPage: number) => {
+    selectSavedPage(newPage - 1);
+  };
+
+  /**
+   * Delete a page from saved pages
+   */
+  const deleteSavedPage = (indexToDelete: number) => {
+    if (savedPages.length <= 1) {
       notify(
         language === "bn"
-          ? "পেজ পরিবর্তন করতে সমস্যা হয়েছে"
-          : "Failed to switch page",
+          ? "কমপক্ষে ১টি পেজ তালিকায় থাকতে হবে"
+          : "At least 1 page must remain in the list",
         "error"
       );
+      return;
     }
+
+    const updated = savedPages.filter((_, idx) => idx !== indexToDelete);
+    const renumbered = updated.map((p, idx) => ({
+      ...p,
+      pageNumber: idx + 1,
+    }));
+    setSavedPages(renumbered);
+
+    let nextActive = activePageIndex;
+    if (activePageIndex >= renumbered.length) {
+      nextActive = renumbered.length - 1;
+    } else if (activePageIndex === indexToDelete) {
+      nextActive = Math.max(0, indexToDelete - 1);
+    }
+    setActivePageIndex(nextActive);
+    selectSavedPage(nextActive);
+
+    notify(
+      language === "bn" ? "পেজ মুছে ফেলা হয়েছে" : "Page deleted from list",
+      "info"
+    );
   };
 
   /**
@@ -595,7 +1070,7 @@ export const WhatsAppDocFix: React.FC = () => {
   };
 
   /**
-   * Apply Perspective Warp & Move to Stage 2 (Clean & Print)
+   * Apply Perspective Warp & Move to Stage 2 (Clean & Print) - AUTO SAVES PAGE
    */
   const applyStraighten = () => {
     if (!imageObjRef.current) return;
@@ -618,19 +1093,61 @@ export const WhatsAppDocFix: React.FC = () => {
 
     // Apply initial clean filter
     const enhanced = applyDocumentEnhancement(warped, settings);
-    setEnhancedDataUrl(enhanced.toDataURL("image/jpeg", 0.95));
+    const enhancedUrl = enhanced.toDataURL("image/jpeg", 0.95);
+    const straightenedUrl = warped.toDataURL("image/jpeg", 0.95);
+    setEnhancedDataUrl(enhancedUrl);
+
+    // === AUTO-SAVE THIS PAGE STATE (বাঁকা সোজা করলে পেজ গুলি অটোমেটিক সেভ হবে) ===
+    const timeNow = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    setLastSavedTime(timeNow);
+    setIsAutoSavedNoticeVisible(true);
+    setTimeout(() => {
+      setIsAutoSavedNoticeVisible(false);
+    }, 3500);
+
+    setSavedPages((prev) => {
+      const updated = [...prev];
+      if (updated[activePageIndex]) {
+        updated[activePageIndex] = {
+          ...updated[activePageIndex],
+          corners: { ...corners },
+          rotation: fineRotation,
+          isStraightened: true,
+          straightenedDataUrl: straightenedUrl,
+          enhancedDataUrl: enhancedUrl,
+          settings: { ...settings },
+          timestamp: Date.now(),
+        };
+      } else {
+        updated.push({
+          id: `page-${Date.now()}`,
+          pageNumber: updated.length + 1,
+          title: `${fileName} - Page ${updated.length + 1}`,
+          sourceDataUrl: sourceDataUrl || enhancedUrl,
+          sourceDimensions,
+          corners: { ...corners },
+          rotation: fineRotation,
+          isStraightened: true,
+          straightenedDataUrl: straightenedUrl,
+          enhancedDataUrl: enhancedUrl,
+          settings: { ...settings },
+          timestamp: Date.now(),
+        });
+      }
+      return updated;
+    });
 
     setStage("enhance");
     notify(
       language === "bn"
-        ? "ডকুমেন্ট সোজা করা সম্পন্ন! এবার পছন্দমতো ফিল্টার বেছে প্রিন্ট করুন।"
-        : "Straightened! Now select print filter.",
+        ? `পেজ ${activePageIndex + 1} সফলভাবে সোজা হয়েছে এবং স্বয়ংক্রিয়ভাবে সেভ করা হয়েছে!`
+        : `Page ${activePageIndex + 1} straightened & auto-saved!`,
       "success"
     );
   };
 
   /**
-   * Update Enhancement Settings and Re-render Output
+   * Update Enhancement Settings and Re-render Output (Auto-syncs with saved page)
    */
   const updateEnhancement = (newSettings: Partial<EnhancementSettings>) => {
     const updated = { ...settings, ...newSettings };
@@ -638,7 +1155,21 @@ export const WhatsAppDocFix: React.FC = () => {
     if (!straightenedCanvas) return;
 
     const enhanced = applyDocumentEnhancement(straightenedCanvas, updated);
-    setEnhancedDataUrl(enhanced.toDataURL("image/jpeg", 0.95));
+    const enhancedUrl = enhanced.toDataURL("image/jpeg", 0.95);
+    setEnhancedDataUrl(enhancedUrl);
+
+    // Auto-update saved page with new filter/enhancement
+    setSavedPages((prev) => {
+      if (!prev[activePageIndex]) return prev;
+      const copy = [...prev];
+      copy[activePageIndex] = {
+        ...copy[activePageIndex],
+        enhancedDataUrl: enhancedUrl,
+        settings: updated,
+        timestamp: Date.now(),
+      };
+      return copy;
+    });
   };
 
   /**
@@ -874,6 +1405,165 @@ export const WhatsAppDocFix: React.FC = () => {
     );
   };
 
+  /**
+   * Download All Saved Pages as a Single Multi-Page PDF
+   */
+  const handleDownloadAllPagesPdf = () => {
+    if (savedPages.length === 0) return;
+
+    // Sync current active page first
+    syncActivePageToState();
+
+    const isLandscape = orientation === "landscape";
+    const pdf = new jsPDF({
+      orientation: isLandscape ? "landscape" : "portrait",
+      unit: "mm",
+      format: paperSize.toLowerCase() as "a4" | "legal" | "letter",
+    });
+
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+
+    const margin = paperMargin === "standard" ? 10 : paperMargin === "narrow" ? 4 : 0;
+    const availWidth = pageWidth - margin * 2;
+    const availHeight = pageHeight - margin * 2;
+
+    let addedCount = 0;
+
+    for (let i = 0; i < savedPages.length; i++) {
+      const pageItem = savedPages[i];
+      // Use enhanced/straightened image if available, else raw source image
+      const imgUrl =
+        i === activePageIndex && enhancedDataUrl
+          ? enhancedDataUrl
+          : pageItem.enhancedDataUrl || pageItem.straightenedDataUrl || pageItem.sourceDataUrl;
+
+      if (!imgUrl) continue;
+
+      if (addedCount > 0) {
+        pdf.addPage(paperSize.toLowerCase(), isLandscape ? "landscape" : "portrait");
+      }
+
+      const imgW = pageItem.sourceDimensions?.width || 800;
+      const imgH = pageItem.sourceDimensions?.height || 1000;
+      const imgRatio = imgW / imgH;
+
+      let drawW = availWidth;
+      let drawH = availWidth / imgRatio;
+
+      if (drawH > availHeight) {
+        drawH = availHeight;
+        drawW = availHeight * imgRatio;
+      }
+
+      const x = (pageWidth - drawW) / 2;
+      const y = (pageHeight - drawH) / 2;
+
+      pdf.addImage(imgUrl, "JPEG", x, y, drawW, drawH);
+      addedCount++;
+    }
+
+    if (addedCount === 0) {
+      notify(
+        language === "bn" ? "PDF তৈরি করার মতো ছবি পাওয়া যায়নি" : "No images available for PDF",
+        "error"
+      );
+      return;
+    }
+
+    pdf.save(`${fileName}_All_${addedCount}_Pages.pdf`);
+    notify(
+      language === "bn"
+        ? `সবগুলো (${addedCount}টি) পেজ ১টি PDF ফাইলে সেভ হয়েছে!`
+        : `All ${addedCount} pages saved into single PDF!`,
+      "success"
+    );
+  };
+
+  /**
+   * Print All Saved Pages in sequence with automatic page breaks
+   */
+  const handlePrintAllPages = () => {
+    if (savedPages.length === 0) return;
+
+    // Sync current active page first
+    syncActivePageToState();
+
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) {
+      window.print();
+      return;
+    }
+
+    const marginStyle =
+      paperMargin === "standard" ? "10mm" : paperMargin === "narrow" ? "4mm" : "0mm";
+
+    const pagesHtml = savedPages
+      .map((p, idx) => {
+        const url =
+          idx === activePageIndex && enhancedDataUrl
+            ? enhancedDataUrl
+            : p.enhancedDataUrl || p.straightenedDataUrl || p.sourceDataUrl;
+        if (!url) return "";
+        return `
+          <div class="print-page">
+            <img src="${url}" alt="Page ${idx + 1}" />
+          </div>
+        `;
+      })
+      .join("");
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>${fileName} - All ${savedPages.length} Pages</title>
+        <style>
+          @page {
+            size: ${paperSize} ${orientation};
+            margin: ${marginStyle};
+          }
+          body {
+            margin: 0;
+            padding: 0;
+            background: #ffffff;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+          .print-page {
+            page-break-after: always;
+            break-after: page;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-sizing: border-box;
+          }
+          .print-page:last-child {
+            page-break-after: avoid;
+            break-after: avoid;
+          }
+          img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            display: block;
+          }
+        </style>
+      </head>
+      <body>
+        ${pagesHtml}
+      </body>
+      </html>
+    `);
+    printWindow.document.close();
+    setTimeout(() => {
+      printWindow.focus();
+      printWindow.print();
+      printWindow.close();
+    }, 600);
+  };
+
   return (
     <div
       onDragOver={handleDragOver}
@@ -1051,6 +1741,197 @@ export const WhatsAppDocFix: React.FC = () => {
             : "Tip: Copy image from WhatsApp Web & press Ctrl+V."}
         </div>
       </div>
+
+      {/* ================= AUTO-SAVED PAGES TRAY & GALLERY (বাঁকা সোজা করলে পেজ গুলি অটোমেটিক সেভ হবে) ================= */}
+      {savedPages.length > 0 && (
+        <div className="bg-slate-900 border border-slate-800/90 rounded-2xl p-3.5 shadow-md">
+          <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 mb-2.5 border-b border-slate-800">
+            <div className="flex items-center gap-2">
+              <span className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                <FileCheck className="w-4 h-4" />
+              </span>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="text-xs font-bold text-slate-200">
+                    {language === "bn" ? "অটো-সেভ করা পেজ তালিকা" : "Auto-Saved Pages Gallery"}
+                  </h3>
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                    <span>
+                      {language === "bn"
+                        ? `মোট ${savedPages.length}টি পেজ (${savedPages.filter((p) => p.isStraightened).length}টি সোজা করা)`
+                        : `${savedPages.length} Pages (${savedPages.filter((p) => p.isStraightened).length} Straightened)`}
+                    </span>
+                  </span>
+                  {lastSavedTime && (
+                    <span className="text-[10px] text-emerald-400 font-medium hidden sm:inline-flex items-center gap-1">
+                      <Save className="w-3 h-3" />
+                      {language === "bn" ? `অটো সেভ হয়েছে: ${lastSavedTime}` : `Auto-saved at: ${lastSavedTime}`}
+                    </span>
+                  )}
+                </div>
+                <p className="text-[11px] text-slate-400">
+                  {language === "bn"
+                    ? "✨ বাঁকা সোজা করলেই প্রতিটি পেজ স্বয়ংক্রিয়ভাবে সেভ হয়ে যায়। পেজে ক্লিক করে যেকোনো সময় এডিট বা প্রিন্ট করুন।"
+                    : "✨ Pages are automatically saved as soon as you straighten them. Click any page to edit or print."}
+                </p>
+              </div>
+            </div>
+
+            {/* Batch actions & Add Page button */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <input
+                type="file"
+                ref={addMoreFilesInputRef}
+                onChange={handleAddMoreFiles}
+                multiple
+                accept=".pdf,application/pdf,image/*,.jpg,.jpeg,.png,.webp,.bmp"
+                className="hidden"
+              />
+
+              <button
+                onClick={() => addMoreFilesInputRef.current?.click()}
+                className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-sky-300 border border-slate-700 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                title={language === "bn" ? "আরও ছবি বা PDF যোগ করুন" : "Add more pages/images"}
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>{language === "bn" ? "+ আরও পেজ যোগ করুন" : "Add Page"}</span>
+              </button>
+
+              {savedPages.length > 1 && (
+                <>
+                  <button
+                    onClick={handlePrintAllPages}
+                    className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow transition-all flex items-center gap-1.5 cursor-pointer"
+                    title={language === "bn" ? "সব পেজ একসাথে প্রিন্ট করুন" : "Print all pages together"}
+                  >
+                    <Printer className="w-3.5 h-3.5" />
+                    <span>{language === "bn" ? "সব পেজ প্রিন্ট" : "Print All"}</span>
+                  </button>
+
+                  <button
+                    onClick={handleDownloadAllPagesPdf}
+                    className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shadow transition-all flex items-center gap-1.5 cursor-pointer"
+                    title={language === "bn" ? "সব পেজ ১টি PDF-এ ডাউনলোড করুন" : "Download all as 1 PDF"}
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>{language === "bn" ? "সব পেজ ১টি PDF" : "All as 1 PDF"}</span>
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Horizontal Scrollable Thumbnails */}
+          <div className="flex items-center gap-3 overflow-x-auto pb-1 pt-1">
+            {savedPages.map((p, idx) => {
+              const isActive = idx === activePageIndex;
+              const thumbUrl =
+                idx === activePageIndex && enhancedDataUrl
+                  ? enhancedDataUrl
+                  : p.enhancedDataUrl || p.straightenedDataUrl || p.sourceDataUrl;
+
+              return (
+                <div
+                  key={p.id}
+                  onClick={() => selectSavedPage(idx)}
+                  className={`group relative flex-shrink-0 w-32 p-2 rounded-xl border transition-all cursor-pointer ${
+                    isActive
+                      ? "bg-sky-950/60 border-sky-500 ring-2 ring-sky-500/40 shadow-md"
+                      : "bg-slate-950/80 border-slate-800 hover:border-slate-700 hover:bg-slate-900/90"
+                  }`}
+                >
+                  {/* Thumbnail Image */}
+                  <div className="w-full h-24 rounded-lg bg-white overflow-hidden flex items-center justify-center p-1 border border-slate-800">
+                    {thumbUrl ? (
+                      <img
+                        src={thumbUrl}
+                        alt={p.title}
+                        className="max-w-full max-h-full object-contain"
+                      />
+                    ) : (
+                      <div className="flex flex-col items-center justify-center text-slate-400 text-[10px]">
+                        <RefreshCw className="w-4 h-4 animate-spin text-sky-400" />
+                        <span>লোড হচ্ছে...</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Page Title & Status */}
+                  <div className="mt-1.5 space-y-1">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className={`font-bold truncate ${isActive ? "text-sky-300" : "text-slate-200"}`}>
+                        {language === "bn" ? `পেজ ${p.pageNumber}` : `Page ${p.pageNumber}`}
+                      </span>
+                      {p.isStraightened ? (
+                        <span
+                          title={language === "bn" ? "সোজা করা হয়েছে এবং সেভ আছে" : "Straightened & Saved"}
+                          className="flex items-center text-[10px] text-emerald-400 font-semibold gap-0.5"
+                        >
+                          <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-slate-500">মূল</span>
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <span
+                        className={`text-[9px] px-1.5 py-0.5 rounded font-medium ${
+                          p.isStraightened
+                            ? "bg-emerald-500/15 text-emerald-300 border border-emerald-500/30"
+                            : "bg-slate-800 text-slate-400 border border-slate-700"
+                        }`}
+                      >
+                        {p.isStraightened
+                          ? language === "bn" ? "সোজা ও সেভ" : "Saved"
+                          : language === "bn" ? "অরিজিনাল" : "Original"}
+                      </span>
+
+                      {savedPages.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteSavedPage(idx);
+                          }}
+                          className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-red-400 rounded transition-opacity cursor-pointer"
+                          title={language === "bn" ? "পেজ মুছুন" : "Delete Page"}
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* Quick Add Page Card */}
+            <button
+              onClick={() => addMoreFilesInputRef.current?.click()}
+              className="flex-shrink-0 w-28 h-[134px] rounded-xl border border-dashed border-slate-700 hover:border-sky-500 bg-slate-950/40 hover:bg-slate-900/80 flex flex-col items-center justify-center gap-1 text-slate-400 hover:text-sky-300 transition-all cursor-pointer p-2"
+            >
+              <Plus className="w-5 h-5 text-sky-400" />
+              <span className="text-xs font-semibold text-center leading-tight">
+                {language === "bn" ? "+ আরও পেজ যোগ করুন" : "+ Add Page"}
+              </span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Auto-Save Toast Notification Banner */}
+      {isAutoSavedNoticeVisible && (
+        <div className="fixed bottom-6 right-6 z-50 bg-emerald-600 text-white px-4 py-2.5 rounded-2xl shadow-2xl flex items-center gap-2 border border-emerald-400/40 animate-bounce">
+          <CheckCircle2 className="w-4 h-4 text-emerald-200" />
+          <span className="text-xs font-bold">
+            {language === "bn"
+              ? `পেজ ${activePageIndex + 1} সফলভাবে সোজা ও অটোমেটিক সেভ হয়েছে!`
+              : `Page ${activePageIndex + 1} straightened and auto-saved!`}
+          </span>
+        </div>
+      )}
 
       {/* Main Multi-Stage Work Area */}
       {stage === "preview" ? (
